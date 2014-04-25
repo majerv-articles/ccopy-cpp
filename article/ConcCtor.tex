@@ -138,58 +138,49 @@ paper we present our approach to make the copy constructor concurrent.
 
 \section{Our approach}
 \label{approach}
-As we said earlier, the heart of our approach is to copying the data members of an object from a given class in different execution threads. To achieve this, we arrange the data members into tuples, which tuples - to be more precise - are disjunct groups of the fields to be copied. The key question is how to form these groups to provide more efficient copy-constructor than its single-threaded version. 
+As we said earlier, the heart of our approach is to copying the data members of an object from a given class in different execution threads. To achieve this, we arrange the data members into tuples, which tuples are disjunct groups of the fields to be copied. The key question is how to form these groups to provide more efficient copy-constructor than its single-threaded version. 
 
 To answer this question we concluded performance tests to see which type of fields and data structures are worth to be copied on a separate thread. These tests showed that in case of primitive types the performance gain is negligible, furthermore it is rather a performance overhead.
 
-Our performance measurements are summarized by the table below.
-// todo insert table here
-
 However these tests also revealed, that
 \begin{itemize}
- \item if a type's copy-constructor is costly enough*, and
+ \item if a type's copy-constructor is expensive\footnote{in this paper under expensive we always mean expensive in time} enough, and
  \item some sort of collection containing objects of this type is stored as a field
 \end{itemize}
 
-then simultaneous copy of these fields can represent a real performance benefit.
-
-Based on these experiences our grouping approach for a given class is:
+then simultaneous copy of these fields can represent a real performance benefit. Based on these experiences our grouping approach for a given class is:
 \begin{enumerate}
  \item Form a group from all of the fields having primitive type, or declared as a pointer
  \item Create a group from fields having user declared type (extending CostlyObject)
  \item Form a group from STL containers containing costly objects
 \end{enumerate}
 
+% rewrote this part
+// ******** rewrite *********
+
 Note, that there is still considerable uncertainty in this grouping mechanism. We refer to costly objects, however it is not trivial to programmatically determine the costs of copying an object. It is hard, yet possible to create heuristics based only on the implementation of a type, but this is beyond the scope of this paper.
 
-Nevertheless this problem can easily addressed with manual contribution from the side of the user. We provided a method with that the implementor of a given type can indicate that its copying is presumably expensive.*(*=in this paper under expensive we always mean expensive in time) This indicator should be used on types recursively, since every type that has at least one field which type or value type is marked as expensive, is expensive itself. Every type marked as expensive is then candidate for having a concurrent copy constructor.
+Nevertheless this problem can easily addressed with manual contribution from the side of the user. We provided a method with that the implementor of a given type can indicate that its copying is presumably expensive. This indicator should be used on types recursively, since every type that has at least one field which type or value type is marked as expensive, is expensive itself. Every type marked as expensive is then candidate for having a concurrent copy constructor. 
+
+//**************************
+% until this point
 
 Having these said, all we have to do is to:
 \begin{enumerate}
- \item look up every class in the compiling units those
- \begin{enumerate}
-  \item do not have a user-defined copy constructor
-  \item marked as expensive type
- \end{enumerate}
- \item generate a copy constructor for each of these class
- \begin{enumerate}
-  \item create separate copy-groups according to the mentioned grouping rules
-  \item execute these groups on separate threads
-  \item join the threads at the end of the copy constructor
- \end{enumerate}
+ \item look up every class in the compiling units those do not have a user-defined copy constructor and marked as expensive type
+ \item generate a copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these these groups execute on separate threads and finally join these threads
 \end{enumerate}
 
 \section{Our architecture}
-To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the clang front-end built on the LLVM compiler architecture for this purpose due to its suitable characteristics. The following is an overview of our tool implementation using clang.
+To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang\footnote{http://clang.llvm.org} front-end built on the LLVM compiler architecture\footnote{http://llvm.org} for this purpose due to its suitable characteristics. The following is an overview of our tool implementation using clang.
 
-When writing a clang based tool, the common entry point is the FrontendAction. FrontendAction is an interface that allows execution of user specific actions as part of the compilation. To run tools over the AST*(*=Abstract syntax tree) clang provides the convenience interface ASTFrontendAction, which takes care of executing the action. The only part left is to implement the CreateASTConsumer method that returns an ASTConsumer per translation unit.
+When writing a clang based tool, the common entry point is the FrontendAction. FrontendAction is an interface that allows execution of user specific actions as part of the compilation. To run tools over the AST (Abstract Syntax Tree) clang provides the convenience interface ASTFrontendAction, which takes care of executing the action. The only part left is to implement the CreateASTConsumer method that returns an ASTConsumer per translation unit.
 
 \begin{verbatim}
 class FindExpensiveClassAction : public clang::ASTFrontendAction {
 public:
   virtual clang::ASTConsumer *CreateASTConsumer(
   	clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
-    llvm::errs() << "Input file: " << InFile << "\n";
     return new FindExpensiveClassConsumer(&Compiler);
   }
 };
@@ -200,8 +191,8 @@ Now we have to define FindExpensiveClassConsumer. ASTConsumer is an interface us
 \begin{verbatim}
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
 public:
-  explicit FindExpensiveClassConsumer(CompilerInstance* compiler)
-    : Visitor(compiler) {}
+  explicit FindExpensiveClassConsumer(CompilerInstance *Compiler)
+    : Visitor(Compiler) {}
 
     virtual void HandleTranslationUnit(clang::ASTContext &Context) {
         Visitor.TraverseDecl(Context.getTranslationUnitDecl());
@@ -218,22 +209,15 @@ The RecursiveASTVisitor provides hooks of the form bool VisitNodeType(NodeType *
 class FindExpensiveClassVisitor
   : public RecursiveASTVisitor<FindExpensiveClassVisitor> {
 public:
-  explicit FindExpensiveClassVisitor(CompilerInstance *compiler)
-    : compiler(compiler) {}
-
+  //...
   bool VisitCXXRecordDecl(CXXRecordDecl *Decl) {
-  	const bool hasCopyCtr = Decl->hasUserDeclaredCopyConstructor();
-  	    
+  	const bool hasCopyCtr = Decl->hasUserDeclaredCopyConstructor();   
     if (!hasCopyCtr && Declaration->isCompleteDefinition()) {
         injectCCopyConstructor(Decl);
     }
-    
     return true;
   }
-
-private:
-  CompilerInstance *compiler;
-  void injectCCopyConstructor(CXXRecordDecl *recordDeclaration);  
+  //...  
 };
 \end{verbatim}
 
