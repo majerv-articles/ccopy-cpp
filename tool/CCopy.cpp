@@ -19,6 +19,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
 
+#include "CopyGroups.h"
+
 using namespace clang;
 
 std::string readFileContent(const char* fileName) {
@@ -39,7 +41,7 @@ class CCopyConstructorInjector {
 public:
     CCopyConstructorInjector(CompilerInstance* compiler);
     void inject(CXXRecordDecl* recordDecl);
-    void dump();
+    void dump(const llvm::StringRef& inFile);
     
 private:
     CompilerInstance* compiler;
@@ -50,28 +52,45 @@ CCopyConstructorInjector::CCopyConstructorInjector(CompilerInstance* compilerIns
     rewriter.setSourceMgr(compiler->getSourceManager(), compiler->getLangOpts());
 }
 
-void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
-    SourceRange sourceRange = recordDecl->getSourceRange();
-    SourceLocation sourceLocation= sourceRange.getEnd();
-    
-    //std::string outName = compiler->getSourceManager().getFilename(sourceLocation);
-    //llvm::errs() << outName  << "\n";
+void CCopyConstructorInjector::inject(CXXRecordDecl*const recordDecl) {
+    const SourceRange sourceRange = recordDecl->getSourceRange();
+    const SourceLocation sourceLocation= sourceRange.getEnd();
     
     const std::string className = recordDecl->getNameAsString();
     
-    rewriter.InsertTextAfter(sourceLocation, "\npublic:\n"+ className + "(const " + className + "& other) {\n");
+    ccopy::CopyGroups copygroups;
+    copygroups.divideBy(recordDecl->field_begin(), recordDecl->field_end());
     
+    if (copygroups.size() < 2) {
+        llvm::outs() << "skipping code generation: less than 2 copy groups, default copy constructor fits" << "\n";
+        rewriter.InsertTextAfter(sourceLocation, "//less than 2 copy groups, default copy constructor fits\n");
+        return;
+    } 
+    
+    rewriter.InsertTextAfter(sourceLocation, "\npublic:\n"+ className + "(const " + className + "& other) {\n");
+
+    for(auto cit = copygroups.begin(); cit != copygroups.end(); ++cit) {
+        ccopy::CopyGroups::group_type group = cit->second;
+
+        for(auto git = group.begin(); git != group.end(); ++git) {
+            std::string fieldName = *git;
+            rewriter.InsertText(sourceLocation, "    " + fieldName + " = other." +  fieldName + ";\n", true, true);
+        }   
+    }
+    
+    /*
     for( RecordDecl::field_iterator fit = recordDecl->field_begin(); fit != recordDecl->field_end(); ++fit ) {
         std::string fieldName = (*fit)->getDeclName().getAsString();
         rewriter.InsertText(sourceLocation, "    " + fieldName + " = other." +  fieldName + ";\n", true, true);
     }
+    */
     
     rewriter.InsertTextAfter(sourceLocation, "}\n\n");
 }
 
-void CCopyConstructorInjector::dump(){
-    std::string outName = "rc.cpp"; //compiler->getSourceManager().getFilename(sourceLocation);
-    llvm::outs() << "Translation unit: " << outName << "\n";
+void CCopyConstructorInjector::dump(const llvm::StringRef& inFile){
+    std::string outName(inFile.data()); //compiler->getSourceManager().getFilename(sourceLocation);
+    llvm::outs() << "Source file: " << outName << "\n";
     
     size_t ext = outName.rfind(".");
     if (ext == std::string::npos)
@@ -112,12 +131,17 @@ public:
   bool VisitCXXRecordDecl(CXXRecordDecl* recordDecl) {
     const bool hasCopyCtr = recordDecl->hasUserDeclaredCopyConstructor();
 
-    if (recordDecl->hasTrivialCopyConstructor() && recordDecl->isCompleteDefinition()) {
-        llvm::outs() << "trivial copy constructor found for " << recordDecl->getNameAsString() << ", skipping code generation\n";
+    if (hasCopyCtr) {
+        llvm::outs() << "copy constructor found for " << recordDecl->getNameAsString() << ", skipping code generation\n";
     }
-
-    if (!hasCopyCtr && recordDecl->isCompleteDefinition()) {
-        injector->inject(recordDecl);
+    else if (recordDecl->isCompleteDefinition()) {
+        if (isC4(recordDecl)) {
+            llvm::outs() << "generating copy constructor for " << recordDecl->getNameAsString() << "\n";
+            injector->inject(recordDecl);
+        }
+        else {
+            llvm::outs() << "no marker on " << recordDecl->getNameAsString() << ", skipping code generation\n";
+        }
     }
 
     return true;
@@ -125,26 +149,40 @@ public:
 
 private:
   CCopyConstructorInjector*const injector;
+  
+  bool isC4(const CXXRecordDecl*const recordDecl) {
+    // FIXME make this work
+    //return recordDecl->isDerivedFrom(recordDeclOfC4);
+    
+    for(auto cit = recordDecl->bases_begin(); cit != recordDecl->bases_end(); ++cit) {
+        if (cit->getType().getAsString() == "class C4") {
+            return true;
+        };
+    }
+    return false;
+  }
+  
 };
 
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
 public:
-  explicit FindExpensiveClassConsumer(CompilerInstance* compiler)
-    : injector(compiler), visitor(compiler, &injector) {}
+  explicit FindExpensiveClassConsumer(CompilerInstance* compiler, llvm::StringRef inFile)
+    : inFile(inFile), injector(compiler), visitor(compiler, &injector) {}
 
     virtual void HandleTranslationUnit(clang::ASTContext& context) {
         visitor.TraverseDecl(context.getTranslationUnitDecl());
-        injector.dump();
+        injector.dump(inFile);
     }
 private:
+  llvm::StringRef inFile;
   CCopyConstructorInjector injector;
   FindExpensiveClassVisitor visitor;
 };
 
 class FindExpensiveClassAction : public clang::ASTFrontendAction {
 public:
-  virtual clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
-    return new FindExpensiveClassConsumer(&Compiler);
+  virtual clang::ASTConsumer* CreateASTConsumer(clang::CompilerInstance& compiler, llvm::StringRef inFile) {
+    return new FindExpensiveClassConsumer(&compiler, inFile);
   }
 };
 
