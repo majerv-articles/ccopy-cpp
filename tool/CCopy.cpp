@@ -29,9 +29,8 @@ std::string readFileContent(const char* fileName) {
                             (std::istreambuf_iterator<char>()) );
     }
     else {
-        llvm::outs() << "Unable to open file";
+        llvm::errs() << "Unable to open file";
         // FIXME use proper exception 
-        //throw 1;
         return "";
     }
 }
@@ -72,35 +71,36 @@ void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
 
 void CCopyConstructorInjector::dump(){
     std::string outName = "rc.cpp"; //compiler->getSourceManager().getFilename(sourceLocation);
-    llvm::errs() << outName  << "\n";
+    llvm::outs() << "Translation unit: " << outName << "\n";
     
     size_t ext = outName.rfind(".");
-  if (ext == std::string::npos)
-     ext = outName.length();
-  outName.insert(ext, "_out");
-  llvm::errs() << "Output to: " << outName << "\n";
-  std::string OutErrorInfo;
-  llvm::raw_fd_ostream outFile(outName.c_str(), OutErrorInfo, llvm::sys::fs::F_None);
+    if (ext == std::string::npos)
+        ext = outName.length();
+  
+    outName.insert(ext, "_out");
+    llvm::outs() << "Generating output to: " << outName << "\n";
+    std::string OutErrorInfo;
+    llvm::raw_fd_ostream outFile(outName.c_str(), OutErrorInfo, llvm::sys::fs::F_None);
 
-  if (OutErrorInfo.empty())
-  {
-    // Output some #ifdefs
-    outFile << "#define AUTHOR Viktor\n";
-    outFile << "#define PROGRAM CCOPY\n";
+    if (OutErrorInfo.empty())
+    {
+        // Output some #ifdefs
+        outFile << "#define AUTHOR majerv\n";
+        outFile << "#define PROGRAM ccopy\n";
 
-    // Now output rewritten source code
-    const RewriteBuffer *RewriteBuf = rewriter.getRewriteBufferFor(compiler->getSourceManager().getMainFileID());
-    const std::string content(RewriteBuf->begin(), RewriteBuf->end());
+        // Now output rewritten source code
+        const RewriteBuffer *RewriteBuf = rewriter.getRewriteBufferFor(compiler->getSourceManager().getMainFileID());
+        const std::string content(RewriteBuf->begin(), RewriteBuf->end());
     
-    llvm::errs() << content;
-    outFile << std::string(RewriteBuf->begin(), RewriteBuf->end());    
-  }
-  else
-  {
-    llvm::errs() << "Cannot open " << outName << " for writing\n";
-  }
+        //llvm::outs() << content;
+        outFile << std::string(RewriteBuf->begin(), RewriteBuf->end());    
+    }
+    else
+    {
+        llvm::errs() << "Cannot open " << outName << " for writing\n";
+    }
 
-  outFile.close();
+    outFile.close();
 }
 
 class FindExpensiveClassVisitor
@@ -111,20 +111,10 @@ public:
 
   bool VisitCXXRecordDecl(CXXRecordDecl* recordDecl) {
     const bool hasCopyCtr = recordDecl->hasUserDeclaredCopyConstructor();
-    
-    //llvm::outs() << "Class: " << Declaration->getQualifiedNameAsString() << " has cctr: " << (hasCopyCtr ? "true" : "false") << "\n";
 
-    if (hasCopyCtr && recordDecl->hasTrivialCopyConstructor()) {
-        llvm::outs() << "trivial copy constructor" << "\n";
-    }    
-
-    /*
-    for( CXXRecordDecl::ctor_iterator cit = Declaration->ctor_begin(); cit != Declaration->ctor_end(); ++cit ) {
-        if ((*cit)->isCopyConstructor()) {
-            llvm::outs() << (*cit)->getDeclName() << "\n";
-        }
+    if (recordDecl->hasTrivialCopyConstructor() && recordDecl->isCompleteDefinition()) {
+        llvm::outs() << "trivial copy constructor found for " << recordDecl->getNameAsString() << ", skipping code generation\n";
     }
-    */
 
     if (!hasCopyCtr && recordDecl->isCompleteDefinition()) {
         injector->inject(recordDecl);
@@ -154,7 +144,6 @@ private:
 class FindExpensiveClassAction : public clang::ASTFrontendAction {
 public:
   virtual clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
-    llvm::errs() << "Input file: " << InFile << "\n";
     return new FindExpensiveClassConsumer(&Compiler);
   }
 };
@@ -162,91 +151,11 @@ public:
 int main(int argc, char **argv) {
   if (argc < 2) {
     llvm::errs() << "Not enough arguments.\n";
-    return 1;    
+    return 1;    l
   }
   
   const char* fileName = argv[1];
-  
   clang::tooling::runToolOnCode(new FindExpensiveClassAction, readFileContent(fileName), fileName);
-  
-  /*
-  CompilerInstance compiler;
-  DiagnosticOptions diagnosticOptions;
-  compiler.createDiagnostics();
-  
-  // Create an invocation that passes any flags to preprocessor
-  CompilerInvocation *Invocation = new CompilerInvocation;
-  compiler.setInvocation(Invocation);
-  
-  // Set default target triple
-  llvm::IntrusiveRefCntPtr<TargetOptions> pto( new TargetOptions());
-  pto->Triple = llvm::sys::getDefaultTargetTriple();
-  llvm::IntrusiveRefCntPtr<TargetInfo>
-     pti(TargetInfo::CreateTargetInfo(compiler.getDiagnostics(),
-                                      pto.getPtr()));
-  compiler.setTarget(pti.getPtr());
-
-  compiler.createFileManager();
-  compiler.createSourceManager(compiler.getFileManager());
-  
-  // Allow C++ code to get rewritten
-  LangOptions langOpts;
-  langOpts.GNUMode = 1;
-  langOpts.CXXExceptions = 1;
-  langOpts.RTTI = 1;
-  langOpts.Bool = 1;
-  langOpts.CPlusPlus = 1;
-  Invocation->setLangDefaults(langOpts,
-                              clang::IK_CXX,
-                              clang::LangStandard::lang_cxx0x);
-  
-  compiler.createPreprocessor(TU_Complete);
-  compiler.createASTContext();
-
-  // Initialize rewriter
-  Rewriter rewriter;
-  rewriter.setSourceMgr(compiler.getSourceManager(), compiler.getLangOpts());
-
-  const FileEntry* file = compiler.getFileManager().getFile(fileName);
-  compiler.getSourceManager().createMainFileID(file);
-  compiler.getDiagnosticClient().BeginSourceFile(compiler.getLangOpts(),
-                                                &compiler.getPreprocessor());
-  
-  FindExpensiveClassConsumer astConsumer(rewriter);                                                       
-
-  // Convert <file>.c to <file_out>.c
-  std::string outName (fileName);
-  size_t ext = outName.rfind(".");
-  if (ext == std::string::npos)
-     ext = outName.length();
-  outName.insert(ext, "_out");
-
-  llvm::errs() << "Output to: " << outName << "\n";
-  std::string OutErrorInfo;
-  llvm::raw_fd_ostream outFile(outName.c_str(), OutErrorInfo, llvm::sys::fs::F_None);
-
-  if (OutErrorInfo.empty())
-  {
-    // Output some #ifdefs
-    outFile << "#define AUTHOR Viktor\n";
-    outFile << "#define PROGRAM CCOPY\n";
-
-    // Parse the AST
-    ParseAST(compiler.getPreprocessor(), &astConsumer, compiler.getASTContext());
-    compiler.getDiagnosticClient().EndSourceFile();
-
-    // Now output rewritten source code
-    const RewriteBuffer *RewriteBuf =
-      rewriter.getRewriteBufferFor(compiler.getSourceManager().getMainFileID());
-    outFile << std::string(RewriteBuf->begin(), RewriteBuf->end());    
-  }
-  else
-  {
-    llvm::errs() << "Cannot open " << outName << " for writing\n";
-  }
-
-  outFile.close();
-  */
     
   return 0;
 }
