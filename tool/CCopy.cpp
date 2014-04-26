@@ -151,7 +151,7 @@ public:
 int main(int argc, char **argv) {
   if (argc < 2) {
     llvm::errs() << "Not enough arguments.\n";
-    return 1;    l
+    return 1;
   }
   
   const char* fileName = argv[1];
