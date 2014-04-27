@@ -236,7 +236,9 @@ private:
 };
 \end{verbatim}
 
-
+The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks a user-defined copy constructor; c) it is marked to have a concurrent one\footnote{it is called C4 check in code, that stands for "Candidate for Concurrent Copy Constructor"}
+%Does this sentence sound silly?
+These prerequisites can be easily checked with methods provided on \texttt{CXXRecordDecl}, even for c) we only need an other record declaration for our \texttt{C4} marker "interface".
 
 \section{Measurements}
 \label{measurements}
