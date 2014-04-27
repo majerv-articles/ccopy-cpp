@@ -181,9 +181,9 @@ When writing a Clang-based tool, the common entry point is the interface \texttt
 \begin{verbatim}
 class FindExpensiveClassAction : public clang::ASTFrontendAction {
 public:
-  virtual clang::ASTConsumer *CreateASTConsumer(
-  	clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
-    return new FindExpensiveClassConsumer(&Compiler);
+  virtual clang::ASTConsumer* CreateASTConsumer(
+  clang::CompilerInstance& compiler, llvm::StringRef inFile) {
+    return new FindExpensiveClassConsumer(&compiler, inFile);
   }
 };
 \end{verbatim}
@@ -192,34 +192,47 @@ We define \texttt{FindExpensiveClassConsumer} that is our implementation of Clan
 
 \begin{verbatim}
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
+  CCopyConstructorInjector injector;
+  FindExpensiveClassVisitor visitor;
+  //...
 public:
-  explicit FindExpensiveClassConsumer(CompilerInstance *Compiler)
-    : Visitor(Compiler) {}
-
-    virtual void HandleTranslationUnit(clang::ASTContext &Context) {
-        Visitor.TraverseDecl(Context.getTranslationUnitDecl());
-    }
-private:
-  FindExpensiveClassVisitor Visitor;
+  FindExpensiveClassConsumer(clang::CompilerInstance* compiler,
+  	llvm::StringRef inFile): inFile(inFile), injector(compiler),
+  	visitor(&injector) {}
+  
+  virtual void HandleTranslationUnit(clang::ASTContext& context) {
+    visitor.TraverseDecl(context.getTranslationUnitDecl());
+    injector.dump(inFile);
+  }
 };
 \end{verbatim}
 
-We implement Clang's \texttt{RecursiveASTVisitor} to extract the relevant information from the AST. It is called \texttt{FindExpensiveClassVisitor} in our tool.
-The \texttt{RecursiveASTVisitor} provides hooks of the form \texttt{bool VisitNodeType(NodeType *)} for most AST nodes. In our case we only need to implement the methods for the relevant node types, which is only \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
+We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector, which will modify the traversed AST by generating and inserting a concurrent copy constructor where applicable. In the end we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
+
+The \texttt{RecursiveASTVisitor} provides hooks of the form \texttt{bool VisitNodeType(NodeType*)} for most AST nodes. In our case we only need to implement the methods for the relevant node types, which is only \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
 
 \begin{verbatim}
 class FindExpensiveClassVisitor
   : public RecursiveASTVisitor<FindExpensiveClassVisitor> {
 public:
-  //...
-  bool VisitCXXRecordDecl(CXXRecordDecl *Decl) {
-  	const bool hasCopyCtr = Decl->hasUserDeclaredCopyConstructor();   
-    if (!hasCopyCtr && Declaration->isCompleteDefinition()) {
-        injectCCopyConstructor(Decl);
+  FindExpensiveClassVisitor(CCopyConstructorInjector* injector)
+    : injector(injector) {}
+
+  bool VisitCXXRecordDecl(CXXRecordDecl* decl) {
+    const bool hasCopyCtr = decl->hasUserDeclaredCopyConstructor();
+    //...
+    if (!hasCopyCtr && decl->isCompleteDefinition() && isC4(decl)) {
+   	    injector->inject(recordDecl);
     }
+    // indicates we continue visiting elements
     return true;
   }
-  //...  
+
+private:
+  bool isC4(const CXXRecordDecl*const recordDecl) {
+    return recordDecl->isDerivedFrom(recordDeclOfC4);
+  }
+  //..
 };
 \end{verbatim}
 

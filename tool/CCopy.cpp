@@ -87,13 +87,6 @@ void CCopyConstructorInjector::inject(CXXRecordDecl*const recordDecl) {
     
     rewriter.InsertText(sourceLocation, joins, true, true);
     
-    /*
-    for( RecordDecl::field_iterator fit = recordDecl->field_begin(); fit != recordDecl->field_end(); ++fit ) {
-        std::string fieldName = (*fit)->getDeclName().getAsString();
-        rewriter.InsertText(sourceLocation, "    " + fieldName + " = other." +  fieldName + ";\n", true, true);
-    }
-    */
-    
     rewriter.InsertTextAfter(sourceLocation, "}\n\n");
 }
 
@@ -134,7 +127,7 @@ void CCopyConstructorInjector::dump(const llvm::StringRef& inFile){
 class FindExpensiveClassVisitor
   : public RecursiveASTVisitor<FindExpensiveClassVisitor> {
 public:
-  explicit FindExpensiveClassVisitor(CompilerInstance* compiler, CCopyConstructorInjector* injector)
+  explicit FindExpensiveClassVisitor(CCopyConstructorInjector* injector)
     : injector(injector) {}
 
   bool VisitCXXRecordDecl(CXXRecordDecl* recordDecl) {
@@ -175,8 +168,8 @@ private:
 
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
 public:
-  explicit FindExpensiveClassConsumer(CompilerInstance* compiler, llvm::StringRef inFile)
-    : inFile(inFile), injector(compiler), visitor(compiler, &injector) {}
+  explicit FindExpensiveClassConsumer(clang::CompilerInstance* compiler, llvm::StringRef inFile)
+    : inFile(inFile), injector(compiler), visitor(&injector) {}
 
     virtual void HandleTranslationUnit(clang::ASTContext& context) {
         visitor.TraverseDecl(context.getTranslationUnitDecl());
