@@ -209,7 +209,7 @@ public:
 
 We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector, which will modify the traversed AST by generating and inserting a concurrent copy constructor where applicable. In the end we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
 
-The \texttt{RecursiveASTVisitor} provides hooks of the form \texttt{bool VisitNodeType(NodeType*)} for most AST nodes. In our case we only need to implement the methods for the relevant node types, which is only \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
+The \texttt{RecursiveASTVisitor} class provides convenient hooks of the form \texttt{bool VisitNodeType(NodeType*)} for most AST nodes. In our case we only need to implement the methods for the relevant node type: \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
 
 \begin{verbatim}
 class FindExpensiveClassVisitor
