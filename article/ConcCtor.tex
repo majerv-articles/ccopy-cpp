@@ -168,11 +168,13 @@ Nevertheless this problem can easily addressed with manual contribution from the
 Having these said, all we have to do is to:
 \begin{enumerate}
  \item look up every class in the compiling units those do not have a user-defined copy constructor and marked as expensive type
- \item generate a copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these these groups execute on separate threads and finally join these threads
+ \item generate copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these these groups execute on separate threads and finally join these threads
 \end{enumerate}
 
 \section{Our architecture}
-To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang\footnote{http://clang.llvm.org} front-end built on the LLVM compiler architecture\footnote{http://llvm.org} for this purpose due to its suitable characteristics. The following is an overview of our tool implementation using clang.
+\label{architecture}
+
+To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang front-end built on the LLVM compiler architecture for this purpose due to its suitable characteristics \cite{lattner:clang}. The following is an overview of our tool implementation using clang.
 
 When writing a clang based tool, the common entry point is the FrontendAction. FrontendAction is an interface that allows execution of user specific actions as part of the compilation. To run tools over the AST (Abstract Syntax Tree) clang provides the convenience interface ASTFrontendAction, which takes care of executing the action. The only part left is to implement the CreateASTConsumer method that returns an ASTConsumer per translation unit.
 
@@ -221,7 +223,7 @@ public:
 };
 \end{verbatim}
 
-\label{architecture}
+
 
 \section{Measurements}
 \label{measurements}
