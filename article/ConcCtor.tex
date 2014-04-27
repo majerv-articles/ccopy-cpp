@@ -188,7 +188,7 @@ public:
 };
 \end{verbatim}
 
-We define \texttt{FindExpensiveClassConsumer} that is our implementation of Clang's \texttt{ASTConsumer} interface for write generic actions on an AST. \texttt{ASTConsumer} provides many different entry points, but for our use case the only one needed is \texttt{HandleTranslationUnit}, which is called with the \texttt{ASTContext} for the translation unit.
+We define \texttt{FindExpensiveClassConsumer} that is our implementation of Clang's \texttt{ASTConsumer} interface for write generic actions on an AST. \texttt{ASTConsumer} provides many different entry points, but for our use case the only one needed is \texttt{HandleTranslationUnit}, which is called with \texttt{ASTContext} for translation unit.
 
 \begin{verbatim}
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
