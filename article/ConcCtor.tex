@@ -158,16 +158,16 @@ then simultaneous copy of these fields can represent a real performance benefit.
 % rewrote this part
 // ******** rewrite *********
 
-Note, that there is still considerable uncertainty in this grouping mechanism. We refer to costly objects, however it is not trivial to programmatically determine the costs of copying an object. It is hard, yet possible to create heuristics based only on the implementation of a type, but this is beyond the scope of this paper.
+Note, that there is still considerable uncertainty in this grouping mechanism. We refer to costly objects, however it is not trivial to programmatically determine the costs of copying an object. It is hard, yet possible to create heuristics based only on the implementation of a type, but this can be addressed as future work.
 
-Nevertheless this problem can easily addressed with manual contribution from the side of the user. We provided a method with that the implementor of a given type can indicate that its copying is presumably expensive. This indicator should be used on types recursively, since every type that has at least one field which type or value type is marked as expensive, is expensive itself. Every type marked as expensive is then candidate for having a concurrent copy constructor. 
+Nevertheless this problem can easily addressed with manual contribution from the side of the user. We provided a method with that the implementor of a given type can indicate that its copying is presumably expensive. This indicator should be used on types recursively, since every type that has at least one field which type or value type is marked as expensive, is expensive itself. Every type marked as expensive is then candidate for having concurrent copy constructor.
 
 //**************************
 % until this point
 
 Having these said, all we have to do is to:
 \begin{enumerate}
- \item look up every class in the compiling units those do not have a user-defined copy constructor and marked as expensive type
+ \item look up every class in the compilation units those do not have user-defined copy constructor and marked as expensive type
  \item generate copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these these groups execute on separate threads and finally join these threads
 \end{enumerate}
 
