@@ -69,14 +69,23 @@ void CCopyConstructorInjector::inject(CXXRecordDecl*const recordDecl) {
     
     rewriter.InsertTextAfter(sourceLocation, "\npublic:\n"+ className + "(const " + className + "& other) {\n");
 
+    std::string joins;
     for(auto cit = copygroups.begin(); cit != copygroups.end(); ++cit) {
         ccopy::CopyGroups::group_type group = cit->second;
 
+        rewriter.InsertText(sourceLocation, "std::thread " + cit->first + "([&](){\n", true, true);
+
         for(auto git = group.begin(); git != group.end(); ++git) {
             std::string fieldName = *git;
-            rewriter.InsertText(sourceLocation, "    " + fieldName + " = other." +  fieldName + ";\n", true, true);
-        }   
+            rewriter.InsertText(sourceLocation, fieldName + " = other." +  fieldName + ";\n", true, true);
+        }
+        
+        rewriter.InsertText(sourceLocation, "});\n\n", true, true);
+        
+        joins += cit->first + ".join()\n";
     }
+    
+    rewriter.InsertText(sourceLocation, joins, true, true);
     
     /*
     for( RecordDecl::field_iterator fit = recordDecl->field_begin(); fit != recordDecl->field_end(); ++fit ) {

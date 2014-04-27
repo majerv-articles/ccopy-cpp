@@ -12,7 +12,9 @@ namespace ccopy {
     class CopyGroups {
     public:
         typedef std::set<std::string> group_type;
-        typedef std::map<std::string, group_type>::const_iterator const_iterator_type;
+        typedef std::map<std::string, group_type> container_type;
+
+        typedef container_type::const_iterator const_iterator_type;
     
         void divideBy(clang::RecordDecl::field_iterator fields_begin, clang::RecordDecl::field_iterator fields_end);
         size_t size() const;
@@ -21,8 +23,11 @@ namespace ccopy {
         const_iterator_type end() { return groups.end(); }
         
     private:
-        std::map<std::string, group_type> groups;
+        container_type groups;
+        
+        std::string determineGroupOf(clang::FieldDecl*const fieldDecl);
     };
 
 }
+
 #endif //COPY_GROUPS_H
