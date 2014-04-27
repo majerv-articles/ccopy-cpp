@@ -176,7 +176,7 @@ Having these said, all we have to do is to:
 
 To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang front-end built on the LLVM compiler architecture for this purpose due to its suitable characteristics \cite{lattner:clang}. The following is an overview of our tool implementation using Clang.
 
-When writing a Clang-based tool, the common entry point is the \texttt{FrontendAction}. This is an interface that allows execution of user specific actions as part of the compilation. To run tools over the AST (Abstract Syntax Tree) Clang provides the convenience interface \texttt{ASTFrontendAction}, which takes care of executing the action. The only part left is to implement the \texttt{CreateASTConsumer} method that returns an \texttt{ASTConsumer} per translation unit.
+When writing a Clang-based tool, the common entry point is the interface \texttt{FrontendAction} that allows execution of user specific actions as part of the compilation. To run tools over the AST (Abstract Syntax Tree) Clang provides the convenience interface \texttt{ASTFrontendAction}, which takes care of executing the action. The only part left is to implement the \texttt{CreateASTConsumer} method that returns an \texttt{ASTConsumer} per translation unit.
 
 \begin{verbatim}
 class FindExpensiveClassAction : public clang::ASTFrontendAction {
