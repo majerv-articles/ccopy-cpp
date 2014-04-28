@@ -71,9 +71,10 @@ void CCopyConstructorInjector::inject(CXXRecordDecl*const recordDecl) {
 
     std::string joins;
     for(auto cit = copygroups.begin(); cit != copygroups.end(); ++cit) {
+        std::string groupName = cit->first;
         ccopy::CopyGroups::group_type group = cit->second;
 
-        rewriter.InsertText(sourceLocation, "std::thread " + cit->first + "([&](){\n", true, true);
+        rewriter.InsertText(sourceLocation, "std::thread " + groupName + "([&](){\n", true, true);
 
         for(auto git = group.begin(); git != group.end(); ++git) {
             std::string fieldName = *git;
@@ -82,11 +83,10 @@ void CCopyConstructorInjector::inject(CXXRecordDecl*const recordDecl) {
         
         rewriter.InsertText(sourceLocation, "});\n\n", true, true);
         
-        joins += cit->first + ".join()\n";
+        joins += groupName + ".join()\n";
     }
     
     rewriter.InsertText(sourceLocation, joins, true, true);
-    
     rewriter.InsertTextAfter(sourceLocation, "}\n\n");
 }
 

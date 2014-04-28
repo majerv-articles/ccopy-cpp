@@ -59,7 +59,7 @@ ideal approach of parallel execution \cite{tripathi:sina}. These languages suppo
 thread-based programming with a base type of thread \cite{oaks:thread}. The programmers have
 to create a subtype and deal with synchronization, communication and locks \cite{hughes:thread}.
 However, thread is low level construct from the view of the processor's architecture. Hard to
-write efficient, scalable and maintainable code for multi- and manycore  architectures with
+write efficient, scalable and maintainable code for multi- and manycore  architectures with 
 this approach.
 
 The C++ programming language is famous for taking advantage of the hardware capabilities. It
@@ -150,25 +150,17 @@ However these tests also revealed, that
 
 then simultaneous copy of these fields can represent a real performance benefit. Based on these experiences our grouping approach for a given class is:
 \begin{enumerate}
- \item Form a group from all of the fields having primitive type, or declared as a pointer
- \item Create a group from fields having user declared type (extending CostlyObject)
- \item Form a group from STL containers containing costly objects
+ \item Form a group from all primitive-typed or pointer fields
+ \item Create a group from fields having user declared type
+ \item Form a group from STL containers containing expensive objects
 \end{enumerate}
 
-% rewrote this part
-// ******** rewrite *********
-
-Note, that there is still considerable uncertainty in this grouping mechanism. We refer to costly objects, however it is not trivial to programmatically determine the costs of copying an object. It is hard, yet possible to create heuristics based only on the implementation of a type, but this can be addressed as future work.
-
-Nevertheless this problem can easily addressed with manual contribution from the side of the user. We provided a method with that the implementor of a given type can indicate that its copying is presumably expensive. This indicator should be used on types recursively, since every type that has at least one field which type or value type is marked as expensive, is expensive itself. Every type marked as expensive is then candidate for having concurrent copy constructor.
-
-//**************************
-% until this point
+It is hard to programmatically determine the costs of copying an object\footnote{it may be addressed as future work}. Therefore we provide ``marker interfaces'' to extend: \texttt{ExpensiveObject} to indicate that the copy of a type is presumably expensive, and \texttt{C4Type} to claim a concurrent copy constructor for it.
 
 Having these said, all we have to do is to:
 \begin{enumerate}
- \item look up every class in the compilation units those do not have user-defined copy constructor and marked as expensive type
- \item generate copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these these groups execute on separate threads and finally join these threads
+ \item look up every class in the compilation units those do not have user-defined copy constructor and marked as \texttt{C4Type}
+ \item generate copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these groups execute on separate threads and finally join these threads
 \end{enumerate}
 
 \section{Our architecture}
@@ -238,16 +230,63 @@ private:
 
 The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks a user-defined copy constructor; c) it is marked to have a concurrent one\footnote{it is called C4 check in code, that stands for ``Candidate for Concurrent Copy Constructor''}
 %Does this sentence sound silly?
-These prerequisites can be easily checked with methods provided on \texttt{CXXRecordDecl}. Even for c) we only need an other record declaration for our \texttt{C4} marker ``interface'', which is as simple as possible.
+These prerequisites can be easily checked with methods provided on \texttt{CXXRecordDecl}. Even for c) we only need an other record declaration for our \texttt{C4Type} ``marker interface'', which is as simple as possible.
 
 \begin{verbatim}
 namespace ccopy {
-  class C4 {};
+  class C4Type {};
   //...
 }
 \end{verbatim}
 
-As we said, the visitor uses a \texttt{CCopyConstructorInjector} instance to get the job done. This custom class utilizes Clang's \texttt{Rewriter} that is the main interface to rewrite buffers (and thus the AST itself).
+Visitor uses a \texttt{CCopyConstructorInjector} and calls its \texttt{inject} method by passing the current \texttt{CXXRecordDecl} object being visited. This custom injector class utilizes Clang's \texttt{Rewriter} that is the main interface to rewrite buffers (and thus the AST itself). 
+
+\texttt{Rewriter} has an \texttt{InsertText(SourceLocation, StringRef)} method that inserts the specified string at the specified location in the original buffer. For us, the end of a type's definition is adequate as the location when inserting a new copy constructor. This can be determined with Clang's \texttt{SourceRange} class available on the visited declaration.
+
+\begin{verbatim}
+void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
+    const SourceRange sourceRange = recordDecl->getSourceRange();
+    const SourceLocation sourceLocation= sourceRange.getEnd();
+    const std::string typeName = recordDecl->getNameAsString();    
+    
+    rewriter.InsertText(sourceLocation,
+    "public:\n"+ typeName + "(const " + typeName + "&rhs) {\n");
+    // insert copy ctr body ...
+}
+\end{verbatim}
+
+For defining the copy constructor's body, the code iterates through the fields of the visited type, and arrange them in disjunct groups. For proper grouping we utilize Clang's \texttt{Type} and its predicates as demonstrated below:
+
+\begin{verbatim}
+std::string CopyGroups::determineGroupOf(FieldDecl* fieldDecl) {
+    const QualType qualType = fieldDecl->getType();
+    const Type*const type = qualType.getTypePtr();
+    
+    if(type->isUnionType() || type->isPointerType()) // ...
+}
+\end{verbatim}
+
+After that - if more than 1 group is created - injector generates simultaneous copy statements by utilizing \texttt{std::thread} and \texttt{labmda} expressions.
+
+\begin{verbatim}
+// copy ctr's body
+ccopy::CopyGroups cg;
+cg.divideBy(recordDecl->field_begin(), recordDecl->field_end());
+
+for(auto cit = copygroups.begin(); cit != copygroups.end(); ++cit) {
+    std::string groupName = cit->first;
+    ccopy::CopyGroups::group_type group = cit->second;
+    insertCopyStmt(rewriter, groupName, group.getFields());         
+}
+\end{verbatim}
+A copy statement looks as follows:
+\begin{verbatim}
+std::thread default_group([&](){
+    i = other.i;
+    y = other.y;
+});
+\end{verbatim}
+
 \section{Measurements}
 \label{measurements}
 
