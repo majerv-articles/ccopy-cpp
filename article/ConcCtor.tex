@@ -59,7 +59,7 @@ ideal approach of parallel execution \cite{tripathi:sina}. These languages suppo
 thread-based programming with a base type of thread \cite{oaks:thread}. The programmers have
 to create a subtype and deal with synchronization, communication and locks \cite{hughes:thread}.
 However, thread is low level construct from the view of the processor's architecture. Hard to
-write efficient, scalable and maintainable code for multi- and manycore  architectures with 
+write efficient, scalable and maintainable code for multi- and manycore  architectures with
 this approach.
 
 The C++ programming language is famous for taking advantage of the hardware capabilities. It
@@ -91,11 +91,9 @@ The object-oriented approach of C++ is based on the value semantics. Let us cons
 have a class that represents complex numbers:
 
 \begin{verbatim}
-class complex
+struct complex 
 {
-private:
   double re, im;
-public:
   // ...
 };
 \end{verbatim}
@@ -119,12 +117,10 @@ Let us consider a more complicated class that represents students. A student has
 first name, mother's name and grades grouped by subjects:
 
 \begin{verbatim}
-class student
+struct student
 {
-private:
   std::string surname, first_name, mother_name;
   std::map<std::string, std::vector<int> > grades;
-public:
   // ...
 };
 \end{verbatim}
@@ -186,7 +182,6 @@ We define \texttt{FindExpensiveClassConsumer} that is our implementation of Clan
 class FindExpensiveClassConsumer : public clang::ASTConsumer {
   CCopyConstructorInjector injector;
   FindExpensiveClassVisitor visitor;
-  //...
 public:
   FindExpensiveClassConsumer(clang::CompilerInstance* compiler,
   	llvm::StringRef inFile): inFile(inFile), injector(compiler),
@@ -207,19 +202,13 @@ The \texttt{RecursiveASTVisitor} class provides convenient hooks of the form \te
 class FindExpensiveClassVisitor
   : public RecursiveASTVisitor<FindExpensiveClassVisitor> {
 public:
-  FindExpensiveClassVisitor(CCopyConstructorInjector* injector)
-    : injector(injector) {}
-
   bool VisitCXXRecordDecl(CXXRecordDecl* decl) {
     const bool hasCopyCtr = decl->hasUserDeclaredCopyConstructor();
-    //...
     if (!hasCopyCtr && decl->isCompleteDefinition() && isC4(decl)) {
    	    injector->inject(recordDecl);
     }
-    // indicates we continue visiting elements
-    return true;
+    return true; // we continue visiting elements
   }
-
 private:
   bool isC4(const CXXRecordDecl*const recordDecl) {
     return recordDecl->isDerivedFrom(recordDeclOfC4);
@@ -228,20 +217,11 @@ private:
 };
 \end{verbatim}
 
-The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks a user-defined copy constructor; c) it is marked to have a concurrent one\footnote{it is called C4 check in code, that stands for ``Candidate for Concurrent Copy Constructor''}
-%Does this sentence sound silly?
-These prerequisites can be easily checked with methods provided on \texttt{CXXRecordDecl}. Even for c) we only need an other record declaration for our \texttt{C4Type} ``marker interface'', which is as simple as possible.
+The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks a user-defined copy constructor; c) it is marked to have a concurrent one.\footnote{it is called C4 check in code, that stands for ``Candidate for Concurrent Copy Constructor''}
 
-\begin{verbatim}
-namespace ccopy {
-  class C4Type {};
-  //...
-}
-\end{verbatim}
+Visitor uses a \texttt{CCopyConstructorInjector} and calls its \texttt{inject} method by passing the current \texttt{CXXRecordDecl} object being visited. This custom injector class utilizes Clang's \texttt{Rewriter} that is the main interface to rewrite buffers (and thus the AST itself). \texttt{Rewriter} has an \texttt{InsertText(SourceLocation, StringRef)} method that inserts the specified string at the specified location.
 
-Visitor uses a \texttt{CCopyConstructorInjector} and calls its \texttt{inject} method by passing the current \texttt{CXXRecordDecl} object being visited. This custom injector class utilizes Clang's \texttt{Rewriter} that is the main interface to rewrite buffers (and thus the AST itself). 
-
-\texttt{Rewriter} has an \texttt{InsertText(SourceLocation, StringRef)} method that inserts the specified string at the specified location in the original buffer. For us, the end of a type's definition is adequate as the location when inserting a new copy constructor. This can be determined with Clang's \texttt{SourceRange} class available on the visited declaration.
+For us, the end of a type's definition is adequate as the location when inserting a new copy constructor. This can be determined with Clang's \texttt{SourceRange} class available on the visited declaration.
 
 \begin{verbatim}
 void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
@@ -252,6 +232,7 @@ void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
     rewriter.InsertText(sourceLocation,
     "public:\n"+ typeName + "(const " + typeName + "&rhs) {\n");
     // insert copy ctr body ...
+    rewriter.InsertText(sourceLocation, "}\n");
 }
 \end{verbatim}
 
@@ -266,7 +247,7 @@ std::string CopyGroups::determineGroupOf(FieldDecl* fieldDecl) {
 }
 \end{verbatim}
 
-After that - if more than 1 group is created - injector generates simultaneous copy statements by utilizing \texttt{std::thread} and \texttt{labmda} expressions.
+After that - if more than 1 group is created - injector generates simultaneous copy statements for the groups by utilizing \texttt{std::thread} and \texttt{labmda} expressions.
 
 \begin{verbatim}
 // copy ctr's body
