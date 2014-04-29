@@ -217,7 +217,7 @@ private:
 };
 \end{verbatim}
 
-The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks a user-defined copy constructor; c) it is marked to have a concurrent one.\footnote{it is called C4 check in code, that stands for ``Candidate for Concurrent Copy Constructor''}
+The code checks for every visited \texttt{CXXRecordDecl} whether the requirements are met: a) it is a complete definition, not just a forward declaration; b) it lacks user-defined copy constructor; c) it is marked to have concurrent one.\footnote{it is called C4 check in code that stands for ``Candidate for Concurrent Copy Constructor''}
 
 Visitor uses a \texttt{CCopyConstructorInjector} and calls its \texttt{inject} method by passing the current \texttt{CXXRecordDecl} object being visited. This custom injector class utilizes Clang's \texttt{Rewriter} that is the main interface to rewrite buffers (and thus the AST itself). \texttt{Rewriter} has an \texttt{InsertText(SourceLocation, StringRef)} method that inserts the specified string at the specified location.
 
@@ -236,7 +236,7 @@ void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
 }
 \end{verbatim}
 
-For defining the copy constructor's body, the code iterates through the fields of the visited type, and arrange them in disjunct groups. For proper grouping we utilize Clang's \texttt{Type} and its predicates as demonstrated below:
+For defining the copy constructor's body, the code iterates through the fields of the visited type and arrange them into disjunct groups. For proper grouping we utilize Clang's \texttt{Type} and its predicates as demonstrated below:
 
 \begin{verbatim}
 std::string CopyGroups::determineGroupOf(FieldDecl* fieldDecl) {
