@@ -194,7 +194,7 @@ public:
 };
 \end{verbatim}
 
-We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector, which will modify the traversed AST by generating and inserting a concurrent copy constructor where applicable. In the end we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
+We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector, which modifies the traversed AST by generating and inserting concurrent copy constructor where applicable. Finally, we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
 
 The \texttt{RecursiveASTVisitor} class provides convenient hooks of the form \texttt{bool VisitNodeType(NodeType*)} for most AST nodes. In our case we only need to implement the methods for the relevant node type: \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
 
@@ -227,7 +227,7 @@ For us, the end of a type's definition is adequate as the location when insertin
 void CCopyConstructorInjector::inject(CXXRecordDecl* recordDecl) {
     const SourceRange sourceRange = recordDecl->getSourceRange();
     const SourceLocation sourceLocation= sourceRange.getEnd();
-    const std::string typeName = recordDecl->getNameAsString();    
+    const std::string typeName = recordDecl->getNameAsString();
     
     rewriter.InsertText(sourceLocation,
     "public:\n"+ typeName + "(const " + typeName + "&rhs) {\n");
@@ -247,7 +247,7 @@ std::string CopyGroups::determineGroupOf(FieldDecl* fieldDecl) {
 }
 \end{verbatim}
 
-After that - if more than 1 group is created - injector generates simultaneous copy statements for the groups by utilizing \texttt{std::thread} and \texttt{labmda} expressions.
+If more than 1 group is created, injector generates simultaneous copy statements for the groups by utilizing \texttt{std::thread} and \emph{lambda} expressions.
 
 \begin{verbatim}
 // copy ctr's body
@@ -257,7 +257,7 @@ cg.divideBy(recordDecl->field_begin(), recordDecl->field_end());
 for(auto cit = copygroups.begin(); cit != copygroups.end(); ++cit) {
     std::string groupName = cit->first;
     ccopy::CopyGroups::group_type group = cit->second;
-    insertCopyStmt(rewriter, groupName, group.getFields());         
+    insertCopyStmt(rewriter, groupName, group.getFields());
 }
 \end{verbatim}
 A copy statement looks as follows:
