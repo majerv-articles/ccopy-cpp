@@ -91,8 +91,7 @@ The object-oriented approach of C++ is based on the value semantics. Let us cons
 have a class that represents complex numbers:
 
 \begin{verbatim}
-struct complex 
-{
+class complex {
   double re, im;
   // ...
 };
@@ -117,7 +116,7 @@ Let us consider a more complicated class that represents students. A student has
 first name, mother's name and grades grouped by subjects:
 
 \begin{verbatim}
-struct student
+class student
 {
   std::string surname, first_name, mother_name;
   std::map<std::string, std::vector<int> > grades;
@@ -151,7 +150,7 @@ then simultaneous copy of these fields can represent a real performance benefit.
  \item Form a group from STL containers containing expensive objects
 \end{enumerate}
 
-It is hard to programmatically determine the costs of copying an object\footnote{it may be addressed as future work}. Therefore we provide ``marker interfaces'' to extend: \texttt{ExpensiveObject} to indicate that the copy of a type is presumably expensive, and \texttt{C4Type} to claim a concurrent copy constructor for it.
+It is hard to programmatically determine the costs of copying an object\footnote{it may be addressed as future work}. For instance, the compiler cannot know how many elements are stored in a vector when it is copied. Thus we provide ``marker interfaces'' to extend: \texttt{ExpensiveObject} to indicate that the copy of a type is presumably expensive, and \texttt{C4Type} to claim a concurrent copy constructor for it.
 
 Having these said, all we have to do is to:
 \begin{enumerate}
