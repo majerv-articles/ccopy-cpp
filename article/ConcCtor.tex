@@ -104,8 +104,7 @@ interface. The automatically created copy constructor copies all the members of 
 that is fine in this case:
 
 \begin{verbatim}
-void f()
-{
+void f() {
   complex a( 3.2, 5.6 );
   complex b = a;
   // ...
@@ -116,8 +115,7 @@ Let us consider a more complicated class that represents students. A student has
 first name, mother's name and grades grouped by subjects:
 
 \begin{verbatim}
-class student
-{
+class student {
   std::string surname, first_name, mother_name;
   std::map<std::string, std::vector<int> > grades;
   // ...
