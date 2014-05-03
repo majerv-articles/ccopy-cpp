@@ -153,13 +153,13 @@ It is hard to programmatically determine the costs of copying an object\footnote
 Having these said, all we have to do is to:
 \begin{enumerate}
  \item look up every class in the compilation units those do not have user-defined copy constructor and marked as \texttt{C4Type}
- \item generate copy constructor for each of these class by creating separate copy-groups according to the mentioned grouping rules, let these groups execute on separate threads and finally join these threads
+ \item generate copy constructor for each of these classes by creating separate copy-groups according to the mentioned grouping rules, let these groups execute on separate threads and finally join these threads
 \end{enumerate}
 
 \section{Our architecture}
 \label{architecture}
 
-To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang front-end built on the LLVM compiler architecture for this purpose due to its suitable characteristics \cite{lattner:clang}. The following is an overview of our tool implementation using Clang.
+To implement the outlined approach we needed a compiler architecture that is flexible and extensible enough to allow this kind of static analysis and source code transformation. We chose the Clang front-end built on the LLVM compiler architecture for this purpose due to its suitable characteristics \cite{lattner:clang,voufo:clang}. The following is an overview of our tool implementation using Clang.
 
 When writing a Clang-based tool, the common entry point is the interface \texttt{FrontendAction} that allows execution of user specific actions as part of the compilation. To run tools over the AST (Abstract Syntax Tree) Clang provides the convenience interface \texttt{ASTFrontendAction}, which takes care of executing the action. The only part left is to implement the \texttt{CreateASTConsumer} method that returns an \texttt{ASTConsumer} per translation unit.
 
@@ -191,7 +191,7 @@ public:
 };
 \end{verbatim}
 
-We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector, which modifies the traversed AST by generating and inserting concurrent copy constructor where applicable. Finally, we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
+We traverse each consumed translation unit with a visitor that implements Clang's \texttt{RecursiveASTVisitor}. It is called \texttt{FindExpensiveClassVisitor} and it holds a reference to our injector that modifies the traversed AST by generating and inserting concurrent copy constructor where applicable. Finally, we write the injector's content back to the parsed source file\footnote{practically we dump the content to \{inFile\}\_out.cpp to preserve original code}.
 
 The \texttt{RecursiveASTVisitor} class provides convenient hooks of the form \texttt{bool VisitNodeType(NodeType*)} for most AST nodes. In our case we only need to implement the methods for the relevant node type: \texttt{CXXRecordDecl} that represents a C++ struct/union/class.
 
