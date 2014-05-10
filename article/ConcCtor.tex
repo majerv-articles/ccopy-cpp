@@ -268,6 +268,33 @@ std::thread default_group([&](){
 \section{Measurements}
 \label{measurements}
 
+As we said earlier, it is not easy to determine when copying of data members on separate threads is effective enough to be worth the efforts. Furthermore the application of the approach for wrong scenarios may cause serious performance overhead as well. To see in which use cases it is worth, we concluded some performance tests.
+
+For these tests we used a small program that creates objects from different input classes, calls the copy constructor of them, and measures the execution time of the copy operation by utilizing \texttt{std::time} and the \texttt{ctime} library. For the tests we simulated an expensive object type by having a 20ms sleep in its copy constructor. The test cases and the measured results are summarized by the following table.
+
+\begin{center}
+    \begin{tabular}{ | p{5cm} | p{3cm} | p{3cm} |}
+    \hline\centering Input test class & \multicolumn{1}{|p{3cm}|}{\centering Exec. time \\(normal, sec)} & \multicolumn{1}{|p{3cm}|}{\centering Exec. time \\(concurrent, sec)}\\ \hline
+    Case 1: 2 \texttt{std::array} members storing 50k \texttt{float}s each 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 0.000183 max: 0.000499\\ avg: 0.000442} 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 0.000655 max: 0.001142\\ avg: 0.000882} \\ \hline
+    Case 2: 2 vector members, both store 50k POD objects (having char and float members) 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 0.002108 max: 0.003976\\ avg: 0.002617} 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 0.002673 max: 0.010437\\ avg: 0.005637} \\ \hline
+    Case 3: 2 vector members storing 100 expensive objects each 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 3.72 \\ max: 4.41 \\ avg: 4.13} 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 1.76 \\ max: 2.23 \\ avg: 2.10} \\ \hline
+    Case 4: 3 vector members storing 100 expensive objects each
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 5.94 \\ max: 6.78 \\ avg: 6.34} 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 3.86 \\ max: 4.77 \\ avg: 4.25} \\ \hline
+    Case 5: 3 vector members storing 500 expensive objects each
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 5.94 \\ max: 6.78 \\ avg: 6.34} 
+    & \multicolumn{1}{|p{3cm}|}{\centering min: 3.86 \\ max: 4.77 \\ avg: 4.25} \\ \hline
+    \end{tabular}
+\end{center}
+
+As a conclusion it can be said, that if an object has expensive data members, especially large collections of them, our approach offers a better alternative to a copy constructor.
+
 \section{Conclusion}
 \label{conc}
 
