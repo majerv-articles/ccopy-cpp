@@ -270,7 +270,7 @@ std::thread default_group([&](){
 
 As we said earlier, it is not easy to determine when copying of data members on separate threads is effective enough to be worth the efforts. Furthermore the application of the approach for wrong scenarios may cause serious performance overhead as well. To see in which use cases it is worth, we concluded some performance tests.
 
-For these tests we used a small program that creates objects from different input classes, calls the copy constructor of them, and measures the execution time of the copy operation by utilizing \texttt{std::time} and the \texttt{ctime} library. For the tests we simulated an expensive object type by having a 20ms sleep in its copy constructor. The test cases and the measured results are summarized by the following table.
+For these tests we used a small program that creates objects from different input classes, calls the copy constructor of them and measures the execution time of the copy operation by utilizing \texttt{std::time} and the \texttt{ctime} library. For the tests we simulated an expensive object type by having a 20ms sleep in its copy constructor. The test cases and the measured results are summarized by the following table.
 
 \begin{center}
     \begin{tabular}{ | p{5cm} | p{3cm} | p{3cm} |}
@@ -293,7 +293,8 @@ For these tests we used a small program that creates objects from different inpu
     \end{tabular}
 \end{center}
 
-As a conclusion it can be said, that if an object has expensive data members, especially large collections of them, our approach offers a better alternative to a copy constructor.
+As a conclusion it can be said, that if an object has expensive data members, especially large collections of them, our approach offers a better alternative to copy constructor.
+The slower the copy constructor, the more speed-up our approach achieves.
 
 \section{Conclusion}
 \label{conc}
