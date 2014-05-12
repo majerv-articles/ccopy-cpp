@@ -77,6 +77,9 @@ to independent targets: without locks, without synchronization problems.
 In this paper we argue for a new kind of copy constructor execution. Because programmers are eager
 for easy-to-use and efficient parallel execution, we define copy constructors to run faster than
 the standard one. We use the Clang architecture for creating custom copy constructors \cite{lattner:clang}.
+We have developed a tool that generates concurrent copy constructor under the circumstances.
+The source code of this tool can be downloaded from the
+\url{https://github.com/majerv-articles/ccopy-cpp/tree/master/tool} URL.
 
 This paper is organized as follows. In the section \ref{motivation} we argue for a new approach
 for making copy constructors concurrent in C++. After, we present our tool and architecture that
